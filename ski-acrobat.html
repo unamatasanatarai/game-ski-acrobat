@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freestyle Aerials - Sunset Modern Retro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #141324;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #e6edf3;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    #wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: 1200px;
+      gap: 16px;
+    }
+    #stage-container {
+      position: relative;
+      /* content-box so the 16:9 ratio applies to the canvases, not the border */
+      box-sizing: content-box;
+      width: calc(100% - 8px);
+      aspect-ratio: 16 / 9;
+      border: 4px solid #ff7b39;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 18px rgba(255, 123, 57, 0.25);
+      background: #000;
+      touch-action: manipulation;
+    }
+    /* Layer 1: Pixelated background/world canvas */
+    #screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      z-index: 1;
+    }
+    /* Layer 2: UI overlay canvas, backing store sized to device pixels at runtime */
+    #ui-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+    }
+    #controls-panel {
+      width: 100%;
+      background: #1d1a33;
+      border: 2px solid #3d3763;
+      border-radius: 6px;
+      padding: 14px 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    @media (max-width: 700px) {
+      #controls-panel { grid-template-columns: 1fr; gap: 8px; }
+    }
+    .badge {
+      display: inline-block;
+      background: #332d56;
+      color: #ffd166;
+      border: 1px solid #6b5fb0;
+      border-radius: 3px;
+      padding: 1px 7px;
+      font-weight: bold;
+      font-family: monospace;
+      margin-right: 4px;
+    }
+    .hilite {
+      color: #38ef7d;
+      font-weight: bold;
+    }
+    /* On-screen buttons, only on touch-first devices */
+    #touch-controls {
+      display: none;
+      width: 100%;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    @media (pointer: coarse) {
+      #touch-controls { display: grid; }
+    }
+    #touch-controls button {
+      background: #332d56;
+      color: #ffd166;
+      border: 2px solid #6b5fb0;
+      border-radius: 6px;
+      padding: 14px 4px;
+      font: bold 13px monospace;
+      touch-action: none;
+    }
+    #touch-controls button:active {
+      background: #6b5fb0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="wrapper">
+  <div id="stage-container">
+    <canvas id="screen" width="384" height="216"></canvas>
+    <canvas id="ui-screen" width="1920" height="1080"></canvas>
+  </div>
+
+  <div id="touch-controls">
+    <button data-code="Space">DROP / RETRY</button>
+    <button data-code="KeyS">BACKFLIP</button>
+    <button data-code="KeyW">FRONTFLIP</button>
+    <button data-code="KeyJ">TWIST</button>
+    <button data-code="KeyD">DAFFY</button>
+    <button data-code="KeyA">MULE</button>
+    <button data-code="ShiftLeft">SWAN</button>
+  </div>
+
+  <div id="controls-panel">
+    <div>
+      <div><span class="badge">SPACE</span> / <span class="badge">ENTER</span> Drop in from tower / Retry</div>
+      <div><span class="badge">S</span> or <span class="badge">↓</span> Backflip (Hold to loop, each full 360° scores)</div>
+      <div><span class="badge">W</span> or <span class="badge">↑</span> Frontflip (Hold to loop, each full 360° scores)</div>
+      <div><span class="badge">J</span> / <span class="badge">Z</span> / <span class="badge">X</span> Pirouette 360° axial spin</div>
+    </div>
+    <div>
+      <div><span class="badge">D</span> or <span class="badge">→</span> Daffy Split &nbsp;|&nbsp; <span class="badge">A</span> or <span class="badge">←</span> Mule Kick</div>
+      <div><span class="badge">SHIFT</span> Swan Dive Layout</div>
+      <div><span class="hilite">LANDING:</span> Center needle into the green zone. Release stunt keys before touchdown.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const bgCanvas = document.getElementById('screen');
+const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+
+const uiCanvas = document.getElementById('ui-screen');
+const uiCtx = uiCanvas.getContext('2d');
+
+const TAU = Math.PI * 2;
+
+// Game world coordinates in native 384x216 grid
+const RAMP_X1 = 18;
+const RAMP_Y1 = 32;
+const RAMP_LIP_X = 92;
+const RAMP_LIP_Y = 114;
+
+const HILL_CREST_X = 242;
+const HILL_CREST_Y = 126;
+const HILL_END_X   = 346;
+const HILL_END_Y   = 198;
+const SLOPE_M      = (HILL_END_Y - HILL_CREST_Y) / (HILL_END_X - HILL_CREST_X); // ~0.692
+const SLOPE_ANGLE  = Math.atan2(HILL_END_Y - HILL_CREST_Y, HILL_END_X - HILL_CREST_X); // ~34.7°
+
+function getGroundY(x) {
+  if (x < HILL_CREST_X) return 999;
+  if (x >= HILL_CREST_X && x <= HILL_END_X) {
+    return HILL_CREST_Y + (x - HILL_CREST_X) * SLOPE_M;
+  }
+  return HILL_END_Y;
+}
+
+// Where loose bodies come to rest: the slope surface, or the runout floor
+function restY(x) {
+  return Math.min(HILL_END_Y, getGroundY(x));
+}
+
+function restAngle(x) {
+  return (x >= HILL_CREST_X && x <= HILL_END_X) ? SLOPE_ANGLE : 0;
+}
+
+// Angle a landing at x is judged against (the knuckle counts as slope)
+function landingAngle(x) {
+  return x > HILL_END_X ? 0 : SLOPE_ANGLE;
+}
+
+function wrapAngle(a) {
+  a = a % TAU;
+  if (a > Math.PI) a -= TAU;
+  if (a <= -Math.PI) a += TAU;
+  return a;
+}
+
+// UI is authored in 1920x1080 space; 5.0x exact scale from pixel game space
+const UI_W = 1920;
+const UI_H = 1080;
+const SCALE = UI_W / 384;
+
+const STATE_GATE     = 0;
+const STATE_INRUN    = 1;
+const STATE_AIRBORNE = 2;
+const STATE_LANDED   = 3;
+const STATE_CRASH    = 4;
+const STATE_SCORED   = 5;
+
+let gameState = STATE_GATE;
+
+// Physics tuning
+const GRAVITY      = 62.0;
+const LAUNCH_VX    = 55.0;
+const LAUNCH_VY    = -105.0; // apex stays on screen (~y=23)
+const GRAB_HOLD    = 0.4;    // seconds a grab must be held to score
+const SCORE_FOR_10 = 12.0;   // trick points needed for a 10.0
+
+const keys = {};
+const PREVENT_DEFAULT_KEYS = new Set(['Space', 'Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+function press(code, repeat) {
+  keys[code] = true;
+  if (!repeat) {
+    if (gameState === STATE_GATE && (code === 'Space' || code === 'Enter')) {
+      gameState = STATE_INRUN;
+    } else if (gameState === STATE_SCORED && (code === 'Space' || code === 'Enter' || code === 'KeyR')) {
+      reset();
+    }
+  }
+  wake();
+}
+
+function release(code) {
+  keys[code] = false;
+}
+
+window.addEventListener('keydown', (e) => {
+  if (PREVENT_DEFAULT_KEYS.has(e.code)) e.preventDefault();
+  press(e.code, e.repeat);
+});
+window.addEventListener('keyup', (e) => release(e.code));
+// Keyup never arrives if focus leaves mid-press; drop everything held
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+});
+
+for (const btn of document.querySelectorAll('#touch-controls button')) {
+  const code = btn.dataset.code;
+  btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    btn.setPointerCapture(e.pointerId);
+    press(code, false);
+  });
+  btn.addEventListener('pointerup', () => release(code));
+  btn.addEventListener('pointercancel', () => release(code));
+}
+document.getElementById('stage-container').addEventListener('pointerdown', () => {
+  press('Space', false);
+  release('Space');
+});
+
+let skier = {};
+let judgeScores = [0, 0, 0, 0, 0];
+let finalScore = 0;
+let particles = [];
+
+function reset() {
+  gameState = STATE_GATE;
+  skier = {
+    x: RAMP_X1,
+    y: RAMP_Y1,
+    vx: 0,
+    vy: 0,
+    angle: 0.83,
+    rotSpeed: 0,
+    twist: 0,        // unwrapped; each multiple of TAU is a completed pirouette
+    twistCount: 0,
+    flipDir: 0,
+    flipAccum: 0,    // rotation since the current flip direction was chosen
+    grabPose: null,
+    grabHold: 0,
+    grabCredited: false,
+    pose: 'TUCK',
+    feed: 'READY AT GATE',
+    tricks: [],
+    rating: 'NONE',
+    down: false,     // crashed and lying on the snow
+    tallyTimer: 0
+  };
+  judgeScores = [0, 0, 0, 0, 0];
+  finalScore = 0;
+  particles = [];
+}
+
+function updateInrun(dt) {
+  const dx = RAMP_LIP_X - RAMP_X1;
+  const dy = RAMP_LIP_Y - RAMP_Y1;
+  const len = Math.hypot(dx, dy);
+  const speed = 76;
+
+  skier.x += (dx / len) * speed * dt;
+  skier.y += (dy / len) * speed * dt;
+  skier.angle = Math.atan2(dy, dx);
+  skier.pose = 'TUCK';
+  skier.feed = 'IN-RUN';
+
+  if (skier.x >= RAMP_LIP_X) {
+    skier.x = RAMP_LIP_X;
+    skier.y = RAMP_LIP_Y - 2;
+    gameState = STATE_AIRBORNE;
+    skier.vx = LAUNCH_VX;
+    skier.vy = LAUNCH_VY;
+    skier.angle = -0.25;
+    skier.rotSpeed = 0;
+    skier.feed = 'AIRBORNE';
+  }
+}
+
+function updateAirborne(dt) {
+  skier.vy += GRAVITY * dt;
+  skier.x  += skier.vx * dt;
+  skier.y  += skier.vy * dt;
+
+  const isBackflip  = keys['KeyS'] || keys['ArrowDown'];
+  const isFrontflip = keys['KeyW'] || keys['ArrowUp'];
+  const isTwist     = keys['KeyJ'] || keys['KeyZ'] || keys['KeyX'];
+  const isDaffy     = keys['KeyD'] || keys['ArrowRight'];
+  const isMule      = keys['KeyA'] || keys['ArrowLeft'];
+  const isSwan      = keys['ShiftLeft'] || keys['ShiftRight'];
+
+  let active = 'NEUTRAL';
+  let targetRotSpeed = 0;
+  let flipDir = 0;
+
+  if (isBackflip) {
+    targetRotSpeed = -3.7;
+    flipDir = -1;
+    active = 'BACKFLIP';
+  } else if (isFrontflip) {
+    targetRotSpeed = 3.6;
+    flipDir = 1;
+    active = 'FRONTFLIP';
+  }
+
+  // Flips score per completed 360°; switching direction starts a new count
+  if (flipDir !== 0 && flipDir !== skier.flipDir) {
+    skier.flipDir = flipDir;
+    skier.flipAccum = 0;
+  }
+  skier.rotSpeed += (targetRotSpeed - skier.rotSpeed) * (1 - Math.exp(-16.0 * dt));
+  skier.angle += skier.rotSpeed * dt;
+  skier.flipAccum += skier.rotSpeed * dt;
+  if (Math.abs(skier.flipAccum) >= TAU) {
+    skier.tricks.push(skier.flipAccum < 0 ? 'BACKFLIP' : 'FRONTFLIP');
+    skier.flipAccum -= Math.sign(skier.flipAccum) * TAU;
+  }
+
+  // Pirouettes score per completed 360°; on release, settle to the nearest whole turn
+  if (isTwist) {
+    skier.twist += 11.0 * dt;
+    active = (active === 'NEUTRAL') ? 'PIROUETTE' : active + '+TWIST';
+  } else {
+    const target = Math.round(skier.twist / TAU) * TAU;
+    const diff = target - skier.twist;
+    const step = 10.0 * dt;
+    skier.twist = Math.abs(diff) <= step ? target : skier.twist + Math.sign(diff) * step;
+  }
+  const twistsDone = Math.floor(skier.twist / TAU + 1e-9);
+  while (skier.twistCount < twistsDone) {
+    skier.twistCount++;
+    skier.tricks.push('FULL TWIST');
+  }
+
+  let grab = null;
+  if (!isBackflip && !isFrontflip) {
+    if (isDaffy) grab = 'DAFFY SPLIT';
+    else if (isMule) grab = 'MULE KICK';
+    else if (isSwan) grab = 'SWAN DIVE';
+  }
+  if (grab) active = grab;
+
+  // Grabs score once per continuous hold of the same grab
+  if (grab && grab === skier.grabPose) {
+    skier.grabHold += dt;
+    if (skier.grabHold >= GRAB_HOLD && !skier.grabCredited) {
+      skier.tricks.push(grab);
+      skier.grabCredited = true;
+    }
+  } else {
+    skier.grabPose = grab;
+    skier.grabHold = 0;
+    skier.grabCredited = false;
+  }
+
+  skier.pose = active;
+  skier.feed = active === 'NEUTRAL' ? 'FLIGHT' : active;
+
+  if (active === 'NEUTRAL') {
+    const diff = wrapAngle(landingAngle(skier.x) - skier.angle);
+    if (Math.abs(diff) < 1.0) {
+      skier.angle += diff * (1 - Math.exp(-3.4 * dt));
+    }
+  }
+
+  const ground = getGroundY(skier.x);
+  if (skier.y >= ground - 2) {
+    skier.y = ground;
+    evaluateLanding();
+  } else if (skier.y > 210) {
+    skier.y = 208;
+    failLanding('OFF COURSE');
+  }
+}
+
+function evaluateLanding() {
+  const diff = Math.abs(wrapAngle(skier.angle - landingAngle(skier.x)));
+  const cleanPose = skier.pose === 'NEUTRAL';
+  const cleanTwist = Math.abs(wrapAngle(skier.twist)) < 0.65;
+
+  if (diff <= 0.52 && cleanPose && cleanTwist) {
+    gameState = STATE_LANDED;
+    skier.angle = restAngle(skier.x);
+    skier.vx = 50.0;
+    skier.twist = 0;
+    skier.rating = diff <= 0.22 ? 'PERFECT' : 'CLEAN';
+    skier.feed = skier.rating === 'PERFECT' ? 'PERFECT LANDING!' : 'CLEAN LANDING';
+    burstSnow(skier.x, skier.y, 16);
+    skier.tallyTimer = 0.9;
+  } else {
+    let reason = 'BAD ANGLE';
+    if (!cleanPose) reason = 'STUNT UNFINISHED';
+    else if (!cleanTwist) reason = 'TWISTING ON IMPACT';
+    failLanding(reason);
+  }
+}
+
+function failLanding(reason) {
+  gameState = STATE_CRASH;
+  skier.feed = 'CRASH: ' + reason;
+  skier.rating = 'CRASH';
+  skier.vx = 20.0;
+  skier.vy = -20.0;
+
+  particles.push({ x: skier.x, y: skier.y, vx: 30, vy: -40, rot: 0.3, vRot: 6, type: 'SKI', settled: false });
+  particles.push({ x: skier.x, y: skier.y, vx: 20, vy: -50, rot: -0.4, vRot: -8, type: 'SKI', settled: false });
+  burstSnow(skier.x, skier.y, 22);
+  skier.tallyTimer = 1.1;
+}
+
+function burstSnow(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x + (Math.random() * 6 - 3),
+      y: y + (Math.random() * 4 - 2),
+      vx: (Math.random() - 0.5) * 36 + (gameState === STATE_LANDED ? 24 : 0),
+      vy: -Math.random() * 26 - 4,
+      life: 0.35 + Math.random() * 0.3,
+      type: 'SNOW'
+    });
+  }
+}
+
+// base points and multipliers for 1st, 2nd, 3rd+ repeat of the same trick
+const TRICK_TABLE = [
+  { match: 'BACKFLIP',  base: 2.4, repeat: [1.0, 0.8, 0.6] },
+  { match: 'FRONTFLIP', base: 2.6, repeat: [1.0, 0.8, 0.6] },
+  { match: 'TWIST',     base: 1.8, repeat: [1.0, 0.5, 0.25] },
+  { match: 'DAFFY',     base: 1.3, repeat: [1.0, 0.25, 0] },
+  { match: 'MULE',      base: 1.3, repeat: [1.0, 0.25, 0] },
+  { match: 'SWAN',      base: 1.5, repeat: [1.0, 0.25, 0] }
+];
+const JUDGE_BIASES = [0.0, 0.1, -0.1, 0.2, -0.2];
+const JUDGE_FLAGS = ['USA', 'SWE', 'SUI', 'AUT', 'JPN'];
+
+function tallyJudges() {
+  gameState = STATE_SCORED;
+  if (skier.rating === 'CRASH') {
+    judgeScores = [0.0, 0.0, 0.0, 0.0, 0.0];
+    finalScore = 0.0;
+    return;
+  }
+
+  let totalPts = 0;
+  const counts = {};
+  for (const t of skier.tricks) {
+    counts[t] = (counts[t] || 0) + 1;
+    const entry = TRICK_TABLE.find(e => t.includes(e.match));
+    if (!entry) continue;
+    totalPts += entry.base * entry.repeat[Math.min(counts[t], entry.repeat.length) - 1];
+  }
+
+  totalPts += (skier.rating === 'PERFECT' ? 2.8 : 1.4);
+  const baseScore = Math.min(10.0, Math.max(2.0, (totalPts / SCORE_FOR_10) * 10.0));
+
+  judgeScores = JUDGE_BIASES.map(b => {
+    const s = baseScore + b + (Math.random() * 0.2 - 0.1);
+    return parseFloat(Math.max(0.1, Math.min(10.0, s)).toFixed(1));
+  });
+
+  const sorted = [...judgeScores].sort((a, b) => a - b);
+  finalScore = parseFloat(((sorted[1] + sorted[2] + sorted[3]) / 3).toFixed(2));
+}
+
+function updateGround(dt) {
+  if (gameState === STATE_LANDED) {
+    skier.x += skier.vx * dt;
+    skier.y = getGroundY(skier.x);
+    if (skier.x > HILL_END_X) {
+      skier.angle = 0;
+      skier.vx = Math.max(14, skier.vx - 16 * dt);
+    }
+  } else if (gameState === STATE_CRASH) {
+    if (!skier.down) {
+      skier.x += skier.vx * dt;
+      skier.y += skier.vy * dt;
+      skier.vy += 85 * dt;
+      skier.angle += 7 * dt;
+      if (skier.vy > 0 && skier.y >= restY(skier.x)) {
+        skier.y = restY(skier.x);
+        skier.down = true;
+      }
+    } else {
+      skier.vx = Math.max(0, skier.vx - 20 * dt);
+      skier.x += skier.vx * dt;
+      skier.y = restY(skier.x);
+    }
+  }
+
+  skier.tallyTimer -= dt;
+  if (skier.tallyTimer <= 0) tallyJudges();
+}
+
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    if (p.settled) continue;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    if (p.type === 'SNOW') {
+      p.vy += 45 * dt;
+      p.life -= dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    } else if (p.type === 'SKI') {
+      p.vy += 80 * dt;
+      p.rot += p.vRot * dt;
+      const floor = restY(p.x);
+      if (p.vy > 0 && p.y >= floor) {
+        p.y = floor;
+        p.vx *= 0.5;
+        p.vy = 0;
+        p.vRot = 0;
+        p.rot = restAngle(p.x);
+        if (Math.abs(p.vx) < 0.5) p.settled = true;
+      }
+    }
+  }
+}
+
+function update(dt) {
+  if (gameState === STATE_INRUN) {
+    updateInrun(dt);
+  } else if (gameState === STATE_AIRBORNE) {
+    updateAirborne(dt);
+  } else if (gameState === STATE_LANDED || gameState === STATE_CRASH) {
+    updateGround(dt);
+  }
+  updateParticles(dt);
+}
+
+// -------------------------------------------------------------
+// BACKGROUND WORLD PIXEL RENDERING (Layer 1 - 384x216)
+// -------------------------------------------------------------
+const SKY_BANDS = [
+  { y: 0,   h: 18, color: '#e84830' },
+  { y: 18,  h: 16, color: '#f05b34' },
+  { y: 34,  h: 18, color: '#f77b3b' },
+  { y: 52,  h: 18, color: '#fa9d4b' },
+  { y: 70,  h: 18, color: '#fdbd63' },
+  { y: 88,  h: 18, color: '#fed483' }
+];
+
+// Everything that never moves is painted once into this canvas
+const staticWorld = document.createElement('canvas');
+staticWorld.width = bgCanvas.width;
+staticWorld.height = bgCanvas.height;
+drawStaticWorld(staticWorld.getContext('2d'));
+
+function renderWorld() {
+  bgCtx.drawImage(staticWorld, 0, 0);
+  drawParticles(bgCtx);
+  drawSkier(bgCtx);
+}
+
+function drawStaticWorld(ctx) {
+  // Sunset Sky Bands
+  for (const b of SKY_BANDS) {
+    ctx.fillStyle = b.color;
+    ctx.fillRect(0, b.y, 384, b.h);
+  }
+
+  // Segmented Synthwave Sunset Sun
+  const sunX = 328;
+  const sunY = 34;
+  const sunR = 23;
+  ctx.fillStyle = '#fee99d';
+  for (let dy = -sunR; dy <= sunR; dy++) {
+    if (dy > 2 && (dy % 4 === 0 || dy % 4 === 1)) continue;
+    const dx = Math.round(Math.sqrt(sunR * sunR - dy * dy));
+    ctx.fillRect(sunX - dx, sunY + dy, dx * 2, 1);
+  }
+
+  // Background Mountains
+  drawPixelMountain(ctx, 180, 72, 70, 50, '#5371a3', '#6f8cb8');
+  drawPixelMountain(ctx, 360, 68, 80, 54, '#5371a3', '#6f8cb8');
+  drawPixelMountain(ctx, 168, 46, 76, 75, '#244579', '#ffffff');
+  drawPixelMountain(ctx, 292, 50, 78, 76, '#244579', '#ffffff');
+
+  // Midground Snowy Hill
+  ctx.fillStyle = '#b6d7ea';
+  ctx.fillRect(0, 116, 384, 100);
+
+  ctx.fillStyle = '#eef6fb';
+  ctx.beginPath();
+  ctx.moveTo(0, 122);
+  ctx.quadraticCurveTo(100, 114, 200, 124);
+  ctx.quadraticCurveTo(280, 132, 384, 124);
+  ctx.lineTo(384, 142);
+  ctx.lineTo(0, 142);
+  ctx.fill();
+
+  // Ridge Pine Trees
+  for (let tx = 88; tx <= 236; tx += 9) {
+    drawPixelPine(ctx, tx, 112 + ((tx * 7) % 6), 5, 11);
+  }
+
+  // Large Foreground Edge Trees
+  drawBigPine(ctx, 10, 180, 24, 60);
+  drawBigPine(ctx, 28, 195, 20, 50);
+  drawBigPine(ctx, 370, 175, 26, 65);
+  drawBigPine(ctx, 355, 195, 22, 52);
+
+  // In-run structure & landing slope
+  drawRampStructure(ctx);
+  drawLandingSlope(ctx);
+  drawJuryBooth(ctx);
+}
+
+function drawPixelMountain(ctx, cx, topY, halfW, height, baseColor, capColor) {
+  const steps = 18;
+  const dy = height / steps;
+  for (let i = 0; i < steps; i++) {
+    const y = Math.round(topY + i * dy);
+    const h = Math.ceil(dy);
+    const w = Math.round((i / steps) * halfW);
+
+    ctx.fillStyle = baseColor;
+    ctx.fillRect(cx - w, y, w * 2, h);
+
+    if (i < steps * 0.52) {
+      ctx.fillStyle = capColor;
+      const capW = Math.round(w * 0.55);
+      ctx.fillRect(cx - Math.round(capW * 0.2), y, capW, h);
+    }
+  }
+}
+
+function drawPixelPine(ctx, x, y, w, h) {
+  ctx.fillStyle = '#183457';
+  ctx.fillRect(x + Math.floor(w/2), y + h - 2, 1, 3);
+  ctx.beginPath();
+  ctx.moveTo(x + w/2, y);
+  ctx.lineTo(x + w, y + h - 2);
+  ctx.lineTo(x, y + h - 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#eef6fb';
+  ctx.fillRect(x + Math.floor(w/2), y + 1, 1, 2);
+}
+
+function drawBigPine(ctx, x, y, w, h) {
+  ctx.fillStyle = '#10233b';
+  ctx.fillRect(x - 2, y, 4, 18);
+  for (let b = 0; b < 4; b++) {
+    const by = y - (b * (h / 4)) - 6;
+    const bw = w * (1 - b * 0.2);
+    ctx.fillStyle = '#10233b';
+    ctx.beginPath();
+    ctx.moveTo(x, by - 12);
+    ctx.lineTo(x + bw/2, by);
+    ctx.lineTo(x - bw/2, by);
+    ctx.fill();
+
+    ctx.fillStyle = '#eef6fb';
+    ctx.fillRect(x - Math.floor(bw/4), by - 4, Math.floor(bw/2), 3);
+  }
+}
+
+function drawRampStructure(ctx) {
+  ctx.fillStyle = '#17273d';
+  const legs = [25, 40, 55, 75];
+  for (const lx of legs) {
+    const progress = (lx - RAMP_X1) / (RAMP_LIP_X - RAMP_X1);
+    const ty = RAMP_Y1 + progress * (RAMP_LIP_Y - RAMP_Y1);
+    ctx.fillRect(lx, ty, 2, 140 - ty);
+  }
+
+  ctx.strokeStyle = '#17273d';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(25, 70); ctx.lineTo(40, 95);
+  ctx.moveTo(40, 70); ctx.lineTo(25, 95);
+  ctx.moveTo(40, 95); ctx.lineTo(55, 120);
+  ctx.moveTo(55, 95); ctx.lineTo(40, 120);
+  ctx.stroke();
+
+  ctx.fillStyle = '#d63428';
+  ctx.beginPath();
+  ctx.moveTo(RAMP_X1 - 4, RAMP_Y1);
+  ctx.lineTo(RAMP_LIP_X, RAMP_LIP_Y);
+  ctx.lineTo(RAMP_LIP_X, RAMP_LIP_Y + 4);
+  ctx.lineTo(RAMP_X1 - 4, RAMP_Y1 + 4);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(RAMP_X1 - 4, RAMP_Y1 - 2);
+  ctx.lineTo(RAMP_LIP_X - 1, RAMP_LIP_Y - 2);
+  ctx.lineTo(RAMP_LIP_X - 1, RAMP_LIP_Y);
+  ctx.lineTo(RAMP_X1 - 4, RAMP_Y1);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(RAMP_LIP_X - 1, RAMP_LIP_Y - 4, 3, 4);
+}
+
+function drawLandingSlope(ctx) {
+  ctx.fillStyle = '#1e385e';
+  ctx.beginPath();
+  ctx.moveTo(HILL_CREST_X - 6, HILL_CREST_Y);
+  ctx.lineTo(HILL_CREST_X + 8, HILL_CREST_Y);
+  ctx.lineTo(HILL_CREST_X - 4, 216);
+  ctx.lineTo(HILL_CREST_X - 16, 216);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(HILL_CREST_X, HILL_CREST_Y);
+  ctx.lineTo(HILL_END_X, HILL_END_Y);
+  ctx.lineTo(384, HILL_END_Y);
+  ctx.lineTo(384, 216);
+  ctx.lineTo(HILL_CREST_X - 4, 216);
+  ctx.fill();
+
+  ctx.fillStyle = '#c5e0f0';
+  ctx.beginPath();
+  ctx.moveTo(HILL_CREST_X + 16, HILL_CREST_Y + 16);
+  ctx.lineTo(HILL_END_X, HILL_END_Y);
+  ctx.lineTo(HILL_END_X, HILL_END_Y + 6);
+  ctx.lineTo(HILL_CREST_X + 16, HILL_CREST_Y + 22);
+  ctx.fill();
+
+  // Red distance marker dots
+  drawSlopeDot(ctx, HILL_CREST_X + 28);
+  drawSlopeDot(ctx, HILL_CREST_X + 58);
+  drawSlopeDot(ctx, HILL_CREST_X + 88);
+
+  drawPixelFlag(ctx, HILL_CREST_X + 16, HILL_CREST_Y + 6, '#d63428');
+  drawPixelFlag(ctx, HILL_CREST_X + 46, HILL_CREST_Y + 28, '#2667b2');
+  drawPixelFlag(ctx, HILL_CREST_X + 76, HILL_CREST_Y + 48, '#d63428');
+}
+
+function drawSlopeDot(ctx, x) {
+  const y = Math.round(getGroundY(x));
+  ctx.fillStyle = '#d63428';
+  for (let d = -5; d <= 5; d += 3) {
+    ctx.fillRect(x + d, y + Math.round(d * SLOPE_M) + 4, 2, 2);
+  }
+}
+
+function drawPixelFlag(ctx, x, y, color) {
+  ctx.fillStyle = '#17273d';
+  ctx.fillRect(x, y - 8, 1, 9);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x + 1, y - 8);
+  ctx.lineTo(x + 6, y - 5);
+  ctx.lineTo(x + 1, y - 2);
+  ctx.fill();
+}
+
+function drawJuryBooth(ctx) {
+  const bx = 114;
+  const by = 146;
+  const bw = 92;
+  const bh = 36;
+
+  ctx.fillStyle = '#d85827';
+  ctx.fillRect(bx, by, bw, bh);
+
+  ctx.fillStyle = '#15253e';
+  ctx.fillRect(bx + 2, by + 2, bw - 4, bh - 4);
+
+  for (let j = 0; j < 5; j++) {
+    const jx = bx + 9 + j * 16;
+    ctx.fillStyle = '#fa9d4b';
+    ctx.fillRect(jx + 2, by + 6, 4, 4);
+    ctx.fillStyle = '#0a1422';
+    ctx.fillRect(jx, by + 10, 8, 7);
+  }
+}
+
+function drawSkier(ctx) {
+  // Snap to whole pixels so sprites don't smear across neighbours
+  const sx = Math.round(skier.x);
+  const sy = Math.round(skier.y);
+
+  if (skier.down) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(restAngle(skier.x));
+    ctx.fillStyle = '#1e73d8';
+    ctx.fillRect(-6, -3, 11, 4);
+    ctx.fillStyle = '#fdbd63';
+    ctx.fillRect(5, -2, 3, 3);
+    ctx.fillStyle = '#d63428';
+    ctx.fillRect(6, -4, 3, 2);
+    ctx.restore();
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(skier.angle);
+
+  const twistScale = Math.abs(Math.cos(skier.twist));
+  const SUIT = '#1e73d8';
+  const HEAD = '#fdbd63';
+  const CAP  = '#d63428';
+  const SKI  = '#d63428';
+
+  if (skier.pose === 'TUCK') {
+    ctx.fillStyle = SUIT;
+    ctx.fillRect(-4, -6, 8, 6);
+    ctx.fillStyle = HEAD;
+    ctx.fillRect(3, -7, 3, 3);
+    ctx.fillStyle = CAP;
+    ctx.fillRect(2, -9, 4, 2);
+    ctx.fillStyle = SKI;
+    ctx.fillRect(-10, 1, 20, 2);
+  } else if (skier.pose === 'DAFFY SPLIT') {
+    ctx.fillStyle = SUIT;
+    ctx.fillRect(-2 * twistScale, -10, 5 * twistScale, 10);
+    ctx.fillStyle = HEAD;
+    ctx.fillRect(-2 * twistScale, -13, 4 * twistScale, 3);
+    ctx.fillStyle = CAP;
+    ctx.fillRect(-2 * twistScale, -15, 4 * twistScale, 2);
+    ctx.fillStyle = SKI;
+    ctx.fillRect(0, -4, 2, 17);
+    ctx.fillRect(-12, -12, 17, 2);
+  } else if (skier.pose === 'MULE KICK') {
+    ctx.fillStyle = SUIT;
+    ctx.fillRect(-2 * twistScale, -11, 5 * twistScale, 11);
+    ctx.fillStyle = HEAD;
+    ctx.fillRect(-2 * twistScale, -14, 4 * twistScale, 3);
+    ctx.fillStyle = CAP;
+    ctx.fillRect(-2 * twistScale, -16, 4 * twistScale, 2);
+    ctx.fillStyle = SKI;
+    ctx.fillRect(-15, -3, 15, 2);
+    ctx.fillRect(-15, 0, 15, 2);
+  } else if (skier.pose === 'SWAN DIVE') {
+    ctx.fillStyle = SUIT;
+    ctx.fillRect(-5, -6, 11, 5);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-6, -9, 13, 2);
+    ctx.fillStyle = HEAD;
+    ctx.fillRect(5, -7, 3, 3);
+    ctx.fillStyle = CAP;
+    ctx.fillRect(6, -9, 3, 2);
+    ctx.fillStyle = SKI;
+    ctx.fillRect(-12, 0, 17, 2);
+  } else {
+    ctx.fillStyle = SUIT;
+    ctx.fillRect(-3 * twistScale, -11, 6 * twistScale, 11);
+    ctx.fillStyle = HEAD;
+    ctx.fillRect(-2 * twistScale, -14, 4 * twistScale, 3);
+    ctx.fillStyle = CAP;
+    ctx.fillRect(-2 * twistScale, -16, 4 * twistScale, 2);
+    if (skier.rating !== 'CRASH') {
+      ctx.fillStyle = SKI;
+      const span = 9 * twistScale + 3;
+      ctx.fillRect(-span, 1, span * 2, 2);
+    }
+  }
+
+  ctx.restore();
+}
+
+function drawParticles(ctx) {
+  for (const p of particles) {
+    if (p.type === 'SNOW') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2);
+    } else if (p.type === 'SKI') {
+      ctx.save();
+      ctx.translate(Math.round(p.x), Math.round(p.y));
+      ctx.rotate(p.rot);
+      ctx.fillStyle = '#d63428';
+      ctx.fillRect(-8, -1, 16, 2);
+      ctx.restore();
+    }
+  }
+}
+
+// -------------------------------------------------------------
+// PIXEL FONT UI RENDERING (Layer 2 - authored at 1920x1080, drawn at device resolution)
+// -------------------------------------------------------------
+function uiFont(px) {
+  return px + 'px "Press Start 2P", monospace';
+}
+
+let uiStatic = null;   // labels that never change, at current backing-store size
+let uiSignature = '';  // last drawn dynamic state; skip redraws when unchanged
+
+function setUITransform(ctx) {
+  ctx.setTransform(uiCanvas.width / UI_W, 0, 0, uiCanvas.height / UI_H, 0, 0);
+}
+
+function resizeUI() {
+  const rect = uiCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(rect.width * dpr));
+  const h = Math.max(1, Math.round(rect.height * dpr));
+  if (uiStatic && uiCanvas.width === w && uiCanvas.height === h) return;
+  uiCanvas.width = w;
+  uiCanvas.height = h;
+
+  uiStatic = document.createElement('canvas');
+  uiStatic.width = w;
+  uiStatic.height = h;
+  drawStaticUI(uiStatic.getContext('2d'));
+  uiSignature = '';
+}
+
+function drawStaticUI(ctx) {
+  setUITransform(ctx);
+  ctx.textAlign = 'left';
+
+  // In-world label: FIS FREESTYLE AERIAL JURY (on the booth)
+  ctx.fillStyle = '#fa9d4b';
+  ctx.font = uiFont(16);
+  ctx.textAlign = 'center';
+  ctx.fillText("FIS FREESTYLE AERIAL JURY", (114 + 46) * SCALE, (146 + 30) * SCALE);
+  ctx.textAlign = 'left';
+
+  // In-world distance labels on slope (markers are evenly spaced, 15m apart)
+  ctx.fillStyle = '#d63428';
+  ctx.font = uiFont(15);
+  ctx.fillText("20m", (HILL_CREST_X + 36) * SCALE, (Math.round(getGroundY(HILL_CREST_X + 28)) + 3) * SCALE);
+  ctx.fillText("35m (K-Point)", (HILL_CREST_X + 66) * SCALE, (Math.round(getGroundY(HILL_CREST_X + 58)) + 3) * SCALE);
+  ctx.fillText("50m", (HILL_CREST_X + 96) * SCALE, (Math.round(getGroundY(HILL_CREST_X + 88)) + 3) * SCALE);
+
+  // Top-Left Banner Box
+  const hx = 6 * SCALE;
+  const hy = 6 * SCALE;
+  const hw = 144 * SCALE;
+  const hh = 26 * SCALE;
+
+  ctx.fillStyle = '#d85827';
+  ctx.fillRect(hx, hy, hw, hh);
+
+  ctx.fillStyle = '#0a1728';
+  ctx.fillRect(hx + 4, hy + 4, hw - 8, hh - 8);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = uiFont(18);
+  ctx.fillText("FREESTYLE AERIALS", hx + 18, hy + 42);
+}
+
+function alignmentMeter() {
+  const diff = wrapAngle(skier.angle - landingAngle(skier.x));
+  const color = Math.abs(diff) <= 0.22 ? '#38ef7d' : (Math.abs(diff) <= 0.52 ? '#ffd166' : '#d63428');
+  return { diff, color };
+}
+
+function renderUI() {
+  const meter = gameState === STATE_AIRBORNE ? alignmentMeter() : null;
+  const signature = [
+    gameState, skier.feed, finalScore,
+    meter ? Math.round(meter.diff * 200) + meter.color : ''
+  ].join('|');
+  if (signature === uiSignature) return;
+  uiSignature = signature;
+
+  uiCtx.setTransform(1, 0, 0, 1, 0, 0);
+  uiCtx.clearRect(0, 0, uiCanvas.width, uiCanvas.height);
+  uiCtx.drawImage(uiStatic, 0, 0);
+  setUITransform(uiCtx);
+  uiCtx.textAlign = 'left';
+
+  uiCtx.fillStyle = '#fa9d4b';
+  uiCtx.font = uiFont(16);
+  uiCtx.fillText(skier.feed.toUpperCase(), 6 * SCALE + 18, 6 * SCALE + 86);
+
+  // Flight Alignment Needle Meter (top-right, clear of the flight path)
+  if (meter) {
+    const gx = 290 * SCALE;
+    const gy = 6 * SCALE;
+    const gw = 88 * SCALE;
+    const gh = 18 * SCALE;
+
+    uiCtx.fillStyle = '#0a1728';
+    uiCtx.fillRect(gx, gy, gw, gh);
+    uiCtx.strokeStyle = '#d85827';
+    uiCtx.lineWidth = 4;
+    uiCtx.strokeRect(gx, gy, gw, gh);
+
+    let markerX = (gx + gw * 0.5) + (meter.diff / 0.8) * (gw * 0.45);
+    markerX = Math.max(gx + 12, Math.min(gx + gw - 16, markerX));
+
+    uiCtx.fillStyle = meter.color;
+    uiCtx.fillRect(markerX - 4, gy + 8, 8, gh - 16);
+
+    // Target center notches
+    uiCtx.fillStyle = '#ffffff';
+    uiCtx.fillRect(gx + gw * 0.5 - 4, gy + 4, 8, 8);
+    uiCtx.fillRect(gx + gw * 0.5 - 4, gy + gh - 12, 8, 8);
+
+    uiCtx.font = uiFont(13);
+    uiCtx.textAlign = 'center';
+    uiCtx.fillText("SLOPE ALIGNMENT", gx + gw / 2, gy + gh + 28);
+    uiCtx.textAlign = 'left';
+  }
+
+  // Official Scoreboard Modal
+  if (gameState === STATE_SCORED) {
+    const mx = 60 * SCALE;
+    const my = 35 * SCALE;
+    const mw = 264 * SCALE;
+    const mh = 110 * SCALE;
+    const cx = mx + mw / 2;
+
+    uiCtx.fillStyle = '#d85827';
+    uiCtx.fillRect(mx, my, mw, mh);
+
+    uiCtx.fillStyle = '#0a1728';
+    uiCtx.fillRect(mx + 8, my + 8, mw - 16, mh - 16);
+
+    uiCtx.textAlign = 'center';
+    uiCtx.fillStyle = '#fa9d4b';
+    uiCtx.font = uiFont(26);
+    uiCtx.fillText("--- FIS OFFICIAL RESULTS ---", cx, my + 80);
+
+    // Individual Judge Cards
+    const cardW = 190;
+    const cardGap = 235;
+    const cardsX = mx + (mw - (cardGap * 4 + cardW)) / 2;
+    for (let i = 0; i < 5; i++) {
+      const cardX = cardsX + i * cardGap;
+      const cardY = my + 130;
+
+      uiCtx.fillStyle = '#15253e';
+      uiCtx.fillRect(cardX, cardY, cardW, 110);
+      uiCtx.strokeStyle = '#d85827';
+      uiCtx.lineWidth = 3;
+      uiCtx.strokeRect(cardX, cardY, cardW, 110);
+
+      uiCtx.fillStyle = '#ffd166';
+      uiCtx.font = uiFont(16);
+      uiCtx.fillText(JUDGE_FLAGS[i], cardX + cardW / 2, cardY + 40);
+
+      uiCtx.fillStyle = '#ffffff';
+      uiCtx.font = uiFont(24);
+      uiCtx.fillText(judgeScores[i].toFixed(1), cardX + cardW / 2, cardY + 86);
+    }
+
+    uiCtx.fillStyle = '#94a3b8';
+    uiCtx.font = uiFont(16);
+    uiCtx.fillText("Olympic System: High & Low scores discarded", cx, my + 300);
+
+    uiCtx.fillStyle = skier.rating === 'CRASH' ? '#ff4d4d' : '#38ef7d';
+    uiCtx.font = uiFont(32);
+    const line = skier.rating === 'CRASH' ? "DISQUALIFIED: 0.00" : `FINAL SCORE: ${finalScore.toFixed(2)} / 10.00`;
+    uiCtx.fillText(line, cx, my + 380);
+
+    uiCtx.fillStyle = '#ffd166';
+    uiCtx.font = uiFont(18);
+    uiCtx.fillText("PRESS [SPACE] OR [ENTER] TO JUMP AGAIN", cx, my + 460);
+    uiCtx.textAlign = 'left';
+  }
+}
+
+// Fixed timestep loop: physics always steps at 120Hz regardless of display rate.
+// The loop sleeps while nothing on screen can change and wakes on input/resize.
+const STEP = 1 / 120;
+const MAX_FRAME = 0.25;
+let started = false;
+let running = false;
+let lastTime = 0;
+let accumulator = 0;
+
+function isIdle() {
+  return (gameState === STATE_GATE || gameState === STATE_SCORED) &&
+         particles.every(p => p.settled);
+}
+
+function frame(now) {
+  accumulator += Math.min(MAX_FRAME, Math.max(0, (now - lastTime) / 1000));
+  lastTime = now;
+  while (accumulator >= STEP) {
+    update(STEP);
+    accumulator -= STEP;
+  }
+
+  renderWorld();
+  renderUI();
+
+  if (isIdle()) {
+    running = false;
+  } else {
+    requestAnimationFrame(frame);
+  }
+}
+
+function wake() {
+  if (!started || running) return;
+  running = true;
+  lastTime = performance.now();
+  accumulator = 0;
+  requestAnimationFrame(frame);
+}
+
+new ResizeObserver(() => {
+  if (!started) return;
+  resizeUI();
+  if (!running) renderUI();
+}).observe(uiCanvas);
+
+// The font is only fetched once something uses it, so request it explicitly
+document.fonts.load(uiFont(16)).catch(() => {}).then(() => {
+  started = true;
+  reset();
+  const urlParams = new URLSearchParams(window.location.search);
+  const demoState = urlParams.get('demo');
+  if (demoState === 'airborne') {
+    gameState = STATE_AIRBORNE;
+    skier.x = 175;
+    skier.y = 52;
+    skier.vx = 48;
+    skier.vy = 8;
+    skier.angle = -0.7;
+    skier.pose = 'DAFFY SPLIT';
+    skier.feed = 'DAFFY SPLIT';
+    skier.tricks = ['BACKFLIP'];
+  } else if (demoState === 'results') {
+    gameState = STATE_SCORED;
+    skier.x = 345;
+    skier.y = 198;
+    skier.angle = 0;
+    skier.pose = 'TUCK';
+    skier.rating = 'PERFECT';
+    skier.feed = 'PERFECT LANDING!';
+    skier.tricks = ['BACKFLIP', 'FULL TWIST', 'DAFFY SPLIT'];
+    judgeScores = [9.4, 9.6, 9.5, 9.7, 9.3];
+    finalScore = 9.50;
+  }
+  resizeUI();
+  wake();
+});
+</script>
+</body>
+</html>

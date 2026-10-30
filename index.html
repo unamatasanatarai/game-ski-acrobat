@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freestyle Aerials | Retro Acrobatic Skiing Game Hub</title>
+  <meta name="description" content="Freestyle Aerials - Precision-timed winter acrobatic skiing simulation running in pure HTML5 Canvas and WebGL. Play directly in your browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0d0c18;
+      --bg-card: #151326;
+      --bg-card-hover: #1c1933;
+      --bg-panel: #1e1b38;
+      --border-subtle: #302b54;
+      --border-accent: #ff7b39;
+      --orange-sunset: #ff7b39;
+      --orange-bright: #fa9d4b;
+      --gold: #ffd166;
+      --green-landing: #38ef7d;
+      --red-crash: #ff4d4d;
+      --text-main: #f0f4f8;
+      --text-muted: #9ba3b8;
+      --text-dim: #68708c;
+      --font-ui: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-pixel: 'Press Start 2P', monospace;
+      --font-mono: 'JetBrains Mono', monospace;
+      --glow-orange: 0 0 24px rgba(255, 123, 57, 0.35);
+      --glow-gold: 0 0 20px rgba(255, 209, 102, 0.3);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(ellipse at 80% 10%, rgba(255, 123, 57, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 20% 40%, rgba(107, 95, 176, 0.15) 0%, transparent 60%),
+        linear-gradient(180deg, #100f1e 0%, var(--bg-dark) 100%);
+      color: var(--text-main);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Container */
+    .container {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header & Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 12, 24, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 0;
+    }
+
+    .nav-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #ff7b39, #f72585);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 14px rgba(255, 123, 57, 0.4);
+      font-size: 18px;
+    }
+
+    .brand-title {
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .brand-title span.sub {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      color: var(--orange-bright);
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s ease;
+    }
+
+    .nav-links a:hover {
+      color: #fff;
+    }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #ff7b39 0%, #e84830 100%);
+      color: #fff;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(255, 123, 57, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .nav-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(255, 123, 57, 0.5);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 64px 0 40px;
+      text-align: center;
+      position: relative;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 123, 57, 0.12);
+      border: 1px solid rgba(255, 123, 57, 0.3);
+      padding: 6px 14px;
+      border-radius: 999px;
+      color: var(--orange-bright);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .badge-pill .pulse-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--green-landing);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green-landing);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+
+    .hero-title {
+      font-size: clamp(34px, 5.5vw, 64px);
+      font-weight: 800;
+      line-height: 1.12;
+      margin-bottom: 18px;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 40%, #ffd166 80%, #ff7b39 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(16px, 2vw, 20px);
+      color: var(--text-muted);
+      max-width: 780px;
+      margin: 0 auto 32px;
+      font-weight: 400;
+    }
+
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 32px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #ff7b39 0%, #d63428 100%);
+      color: #fff;
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      padding: 16px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      border: 2px solid #ffa46e;
+      box-shadow: 0 10px 28px rgba(255, 123, 57, 0.4);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 14px 34px rgba(255, 123, 57, 0.6);
+      background: linear-gradient(135deg, #ff8c4f 0%, #e03c30 100%);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: #1e1b38;
+      color: var(--gold);
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      padding: 16px 28px;
+      border-radius: 8px;
+      text-decoration: none;
+      border: 2px solid #494073;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-3px);
+      background: #2a254d;
+      border-color: var(--gold);
+      box-shadow: var(--glow-gold);
+    }
+
+    .stat-pills {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .stat-pill {
+      background: rgba(30, 27, 56, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-pill strong {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Live Arcade Viewport Section */
+    .arcade-section {
+      padding: 24px 0 60px;
+    }
+
+    .arcade-card {
+      background: #141324;
+      border: 2px solid var(--border-subtle);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(255, 123, 57, 0.15);
+    }
+
+    .arcade-header {
+      background: #1c1933;
+      border-bottom: 2px solid var(--border-subtle);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .arcade-tabs {
+      display: flex;
+      background: #110f22;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      gap: 4px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+    }
+
+    .tab-btn.active {
+      background: #ff7b39;
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(255, 123, 57, 0.4);
+    }
+
+    .arcade-controls-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .action-btn-small {
+      background: #272344;
+      color: var(--text-main);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    }
+
+    .action-btn-small:hover {
+      background: #36305e;
+      border-color: #554d87;
+      transform: translateY(-1px);
+    }
+
+    .viewport-container {
+      position: relative;
+      width: 100%;
+      background: #000;
+      aspect-ratio: 16 / 9;
+    }
+
+    .game-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+      background: #000;
+    }
+
+    .arcade-footer-bar {
+      background: #19162e;
+      border-top: 1px solid var(--border-subtle);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .arcade-status-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-tag {
+      background: #292447;
+      color: var(--orange-bright);
+      font-family: var(--font-pixel);
+      font-size: 9px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #4a4175;
+    }
+
+    .keys-quick-hint {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .keycap {
+      display: inline-block;
+      background: #2c274d;
+      color: var(--gold);
+      border: 1px solid #5a5191;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 2px 0 #18152e;
+    }
+
+    /* Section Titles */
+    .section-header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .section-eyebrow {
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      color: var(--orange-bright);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .section-heading {
+      font-size: clamp(26px, 3.5vw, 38px);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.01em;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 16px;
+      max-width: 640px;
+      margin: 10px auto 0;
+    }
+
+    /* Game Editions Showcase Cards */
+    .editions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 32px;
+      margin-bottom: 80px;
+    }
+
+    .edition-card {
+      background: var(--bg-card);
+      border: 2px solid var(--border-subtle);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .edition-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--orange-sunset);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 123, 57, 0.2);
+    }
+
+    .card-media-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .card-media-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.35s ease;
+      cursor: pointer;
+    }
+
+    .edition-card:hover .card-media-img {
+      transform: scale(1.03);
+    }
+
+    .card-media-tag {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(13, 12, 24, 0.85);
+      border: 1px solid var(--border-accent);
+      color: var(--gold);
+      font-family: var(--font-pixel);
+      font-size: 10px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .card-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .card-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .card-version {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--orange-bright);
+      background: rgba(255, 123, 57, 0.12);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      flex-grow: 1;
+    }
+
+    .feature-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 24px;
+    }
+
+    .feature-tag {
+      background: #1e1b36;
+      border: 1px solid #3d3763;
+      color: #b7b0db;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .card-btn-play {
+      flex: 1;
+      background: linear-gradient(135deg, #ff7b39, #d63428);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 12px 16px;
+      border-radius: 6px;
+      text-align: center;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .card-btn-play:hover {
+      background: linear-gradient(135deg, #ff8c4f, #e33e31);
+      box-shadow: 0 4px 16px rgba(255, 123, 57, 0.4);
+    }
+
+    .card-btn-direct {
+      background: #252140;
+      color: var(--gold);
+      border: 1px solid #4a4175;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 12px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .card-btn-direct:hover {
+      background: #332d56;
+      border-color: var(--gold);
+    }
+
+    /* Core Mechanics Grid */
+    .mechanics-section {
+      padding: 40px 0 80px;
+    }
+
+    .mechanics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+    }
+
+    .mechanic-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 24px;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .mechanic-card:hover {
+      border-color: #5d5394;
+      transform: translateY(-3px);
+    }
+
+    .mechanic-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+
+    .mechanic-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .mechanic-desc {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    /* Controls & Rules Section */
+    .controls-section {
+      padding: 40px 0 80px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 850px) {
+      .controls-grid { grid-template-columns: 1fr; }
+    }
+
+    .controls-panel {
+      background: var(--bg-card);
+      border: 2px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 24px;
+    }
+
+    .panel-heading {
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      color: var(--gold);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+
+    .controls-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .controls-table tr {
+      border-bottom: 1px solid rgba(48, 43, 84, 0.4);
+    }
+
+    .controls-table tr:last-child {
+      border-bottom: none;
+    }
+
+    .controls-table td {
+      padding: 10px 4px;
+      vertical-align: middle;
+    }
+
+    .controls-table td.key-col {
+      width: 45%;
+      white-space: nowrap;
+    }
+
+    .controls-table td.desc-col {
+      color: var(--text-muted);
+    }
+
+    .scoring-rules-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .scoring-rules-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .scoring-rules-list li .rule-num {
+      background: #2c274d;
+      color: var(--orange-bright);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Screenshots Gallery */
+    .gallery-section {
+      padding: 40px 0 90px;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .gallery-item {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid var(--border-subtle);
+      background: #000;
+      cursor: pointer;
+      aspect-ratio: 16 / 9;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .gallery-item:hover {
+      transform: translateY(-4px);
+      border-color: var(--orange-sunset);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.7), 0 0 16px rgba(255, 123, 57, 0.25);
+    }
+
+    .gallery-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .gallery-caption {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(180deg, transparent, rgba(13, 12, 24, 0.95) 75%);
+      padding: 20px 14px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .gallery-caption span.sub {
+      font-size: 10px;
+      color: var(--orange-bright);
+      display: block;
+      font-weight: 400;
+    }
+
+    /* Image Lightbox Modal */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(8, 7, 16, 0.92);
+      backdrop-filter: blur(10px);
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+    }
+
+    .lightbox.active {
+      display: flex;
+    }
+
+    .lightbox-content {
+      max-width: 1100px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+    }
+
+    .lightbox-img {
+      max-width: 100%;
+      max-height: 80vh;
+      border-radius: 8px;
+      border: 3px solid var(--orange-sunset);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+    }
+
+    .lightbox-caption {
+      color: var(--text-main);
+      font-size: 14px;
+      font-weight: 500;
+      text-align: center;
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: -40px;
+      right: 0;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 28px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      background: #0a0914;
+      padding: 48px 0 36px;
+      color: var(--text-dim);
+      font-size: 13px;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover {
+      color: #fff;
+    }
+
+    /* Responsive Utilities */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero { padding: 40px 0 24px; }
+      .arcade-header { flex-direction: column; align-items: stretch; }
+      .arcade-tabs { justify-content: stretch; }
+      .tab-btn { flex: 1; justify-content: center; }
+      .arcade-controls-top { justify-content: center; }
+      .arcade-footer-bar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header>
+    <div class="container nav-wrapper">
+      <a href="./index.html" class="brand" id="brand-link">
+        <div class="brand-icon">⛷️</div>
+        <div class="brand-title">
+          FREESTYLE AERIALS
+          <span class="sub">Olympic Arcade Hub</span>
+        </div>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#arcade-player">Play Game</a></li>
+        <li><a href="#editions">Editions</a></li>
+        <li><a href="#mechanics">Physics & Rules</a></li>
+        <li><a href="#controls">Controls</a></li>
+        <li><a href="#gallery">Gallery</a></li>
+      </ul>
+      <a href="#arcade-player" class="nav-btn" id="nav-play-btn">
+        <span>▶</span> Play Now
+      </a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="container">
+    <section class="hero" id="hero-section">
+      <div class="badge-pill">
+        <span class="pulse-dot"></span>
+        Zero Dependencies • 100% Pure Web Standards
+      </div>
+      <h1 class="hero-title">Precision Winter Acrobatics<br>Right in Your Browser</h1>
+      <p class="hero-subtitle">
+        Drop down the in-run tower, launch off the kicker, string multi-rotation flips and axial twists mid-air, and stick the 35° mountain landing before an international FIS jury.
+      </p>
+      <div class="hero-actions">
+        <button class="btn-primary" id="hero-canvas-btn" onclick="switchGame('ski-acrobat.html', 'Canvas 2D')">
+          ▶ PLAY CANVAS 2D
+        </button>
+        <button class="btn-secondary" id="hero-webgl-btn" onclick="switchGame('ski-acrobat-gl.html', 'WebGL Shader')">
+          ⚡ PLAY WEBGL GPU
+        </button>
+      </div>
+      <div class="stat-pills">
+        <div class="stat-pill"><strong>Physics:</strong> 120Hz Decoupled</div>
+        <div class="stat-pill"><strong>Judging:</strong> 5-Nation FIS Olympic Scoring</div>
+        <div class="stat-pill"><strong>Controls:</strong> Keyboard & Touch</div>
+        <div class="stat-pill"><strong>Delivery:</strong> Single-File Zero-Build</div>
+      </div>
+    </section>
+
+    <!-- Interactive Arcade Viewport -->
+    <section class="arcade-section" id="arcade-player">
+      <div class="section-header">
+        <span class="section-eyebrow">LIVE PLAYABLE ARENA</span>
+        <h2 class="section-heading">Instant Arcade Viewport</h2>
+        <p class="section-desc">Experience both the classic dual-canvas and modern WebGL GPU editions directly below or open them in standalone windows.</p>
+      </div>
+
+      <div class="arcade-card">
+        <div class="arcade-header">
+          <div class="arcade-tabs">
+            <button class="tab-btn active" id="tab-canvas" onclick="switchGame('ski-acrobat.html', 'Canvas 2D')">
+              🎨 Canvas 2D Edition
+            </button>
+            <button class="tab-btn" id="tab-webgl" onclick="switchGame('ski-acrobat-gl.html', 'WebGL Shader')">
+              ⚡ WebGL Shader Edition
+            </button>
+          </div>
+          <div class="arcade-controls-top">
+            <button class="action-btn-small" id="reload-btn" onclick="reloadGame()" title="Restart the game session">
+              🔄 Reload
+            </button>
+            <button class="action-btn-small" id="focus-btn" onclick="focusGame()" title="Focus keyboard input to the game">
+              🎯 Focus Keys
+            </button>
+            <button class="action-btn-small" id="fullscreen-btn" onclick="toggleFullscreen()" title="Play in Fullscreen">
+              ⛶ Fullscreen
+            </button>
+            <a href="./ski-acrobat.html" target="_blank" class="action-btn-small" id="standalone-link" title="Open in new window">
+              ↗ Standalone
+            </a>
+          </div>
+        </div>
+
+        <div class="viewport-container" id="stage-viewport">
+          <iframe 
+            id="game-frame" 
+            class="game-iframe" 
+            src="./ski-acrobat.html" 
+            title="Freestyle Aerials Game Viewport"
+            allow="fullscreen"
+            tabindex="0">
+          </iframe>
+        </div>
+
+        <div class="arcade-footer-bar">
+          <div class="arcade-status-info">
+            <span class="status-tag" id="active-engine-badge">CANVAS 2D ENGINE</span>
+            <span>Click inside viewport or press <strong style="color:#fff;">SPACE</strong> to jump.</span>
+          </div>
+          <div class="keys-quick-hint">
+            <span><span class="keycap">SPACE</span> Drop / Retry</span>
+            <span><span class="keycap">S</span> Backflip</span>
+            <span><span class="keycap">W</span> Frontflip</span>
+            <span><span class="keycap">J</span> Twist</span>
+            <span><span class="keycap">D</span> Daffy</span>
+            <span><span class="keycap">A</span> Mule</span>
+            <span><span class="keycap">SHIFT</span> Swan</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Game Editions Showcase Cards -->
+    <section class="editions-section" id="editions">
+      <div class="section-header">
+        <span class="section-eyebrow">CHOOSE YOUR RENDERER</span>
+        <h2 class="section-heading">Two Engineered Editions</h2>
+        <p class="section-desc">Each edition is handcrafted around distinct web graphics paradigms, sharing the exact same deterministic 120Hz physics simulation.</p>
+      </div>
+
+      <div class="editions-grid">
+        <!-- Canvas 2D Edition Card -->
+        <article class="edition-card" id="card-canvas2d">
+          <div class="card-media-wrapper" onclick="openLightbox('./assets/screenshots/canvas2d-gate.png', 'Canvas 2D Edition - Sunset In-Run Starting Tower')">
+            <img 
+              src="./assets/screenshots/canvas2d-gate.png" 
+              alt="Freestyle Aerials Canvas 2D Starting Gate" 
+              class="card-media-img"
+              loading="lazy">
+            <span class="card-media-tag">CANVAS 2D</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title-row">
+              <h3 class="card-title">Classic Canvas 2D</h3>
+              <span class="card-version">ski-acrobat.html</span>
+            </div>
+            <p class="card-desc">
+              Features an authentic dual-canvas architecture: a pixelated 384×216 background canvas for retro sunset mountains and trees, composited seamlessly beneath an authored 1920×1080 dynamic subpixel vector UI overlay. Zero memory allocations during active runtime.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">Dual-Layer Compositing</span>
+              <span class="feature-tag">120Hz Physics</span>
+              <span class="feature-tag">Pixel-Art Native</span>
+              <span class="feature-tag">Low Power Sleep Loop</span>
+            </div>
+            <div class="card-actions">
+              <button class="card-btn-play" onclick="switchGame('ski-acrobat.html', 'Canvas 2D')">
+                ▶ Play in Viewport
+              </button>
+              <a href="./ski-acrobat.html" target="_blank" class="card-btn-direct" title="Open full screen in standalone tab">
+                ↗ Standalone
+              </a>
+            </div>
+          </div>
+        </article>
+
+        <!-- WebGL GPU Edition Card -->
+        <article class="edition-card" id="card-webgl">
+          <div class="card-media-wrapper" onclick="openLightbox('./assets/screenshots/webgl-airborne.png', 'WebGL Shader Edition - Mid-Air Daffy Stunt with Alignment Telemetry')">
+            <img 
+              src="./assets/screenshots/webgl-airborne.png" 
+              alt="Freestyle Aerials WebGL Edition Mid-Air Stunt" 
+              class="card-media-img"
+              loading="lazy">
+            <span class="card-media-tag">WEBGL SHADERS</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title-row">
+              <h3 class="card-title">WebGL GPU Edition</h3>
+              <span class="card-version">ski-acrobat-gl.html</span>
+            </div>
+            <p class="card-desc">
+              A single-context hardware-accelerated WebGL batch renderer. Custom vertex and fragment shaders draw both pixel-art terrain and font atlas glyphs in unified GPU batches. Delivers blistering frame consistency on high-refresh desktop monitors and mobile devices.
+            </p>
+            <div class="feature-tags">
+              <span class="feature-tag">GPU Shader Pipeline</span>
+              <span class="feature-tag">Font Atlas Batching</span>
+              <span class="feature-tag">High-Refresh Display Ready</span>
+              <span class="feature-tag">Hardware Accelerated</span>
+            </div>
+            <div class="card-actions">
+              <button class="card-btn-play" onclick="switchGame('ski-acrobat-gl.html', 'WebGL Shader')">
+                ⚡ Play in Viewport
+              </button>
+              <a href="./ski-acrobat-gl.html" target="_blank" class="card-btn-direct" title="Open full screen in standalone tab">
+                ↗ Standalone
+              </a>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Core Mechanics Section -->
+    <section class="mechanics-section" id="mechanics">
+      <div class="section-header">
+        <span class="section-eyebrow">PHYSICS & SIMULATION</span>
+        <h2 class="section-heading">Built Like an Olympic Event</h2>
+        <p class="section-desc">Every element of Freestyle Aerials is grounded in deterministic aerial mechanics and official competition rules.</p>
+      </div>
+
+      <div class="mechanics-grid">
+        <div class="mechanic-card">
+          <div class="mechanic-icon">⏱️</div>
+          <h3 class="mechanic-title">120Hz Decoupled Physics</h3>
+          <p class="mechanic-desc">The simulation steps at a strict 120Hz fixed-timestep accumulator, ensuring consistent rotational velocity and flight arcs across 60Hz, 120Hz, and 144Hz displays.</p>
+        </div>
+
+        <div class="mechanic-card">
+          <div class="mechanic-icon">🔄</div>
+          <h3 class="mechanic-title">Multi-Axis Stunt Engine</h3>
+          <p class="mechanic-desc">Execute continuous 360° backflips and frontflips, combine them with axial pirouette spins, or hold classic grabs like the Daffy Split, Mule Kick, and Swan Dive.</p>
+        </div>
+
+        <div class="mechanic-card">
+          <div class="mechanic-icon">🎯</div>
+          <h3 class="mechanic-title">Slope Alignment Meter</h3>
+          <p class="mechanic-desc">A live HUD needle gauges your angular deviation from the 34.7° snow hill. Center the needle in the green zone and release trick holds before touchdown for a Perfect Landing.</p>
+        </div>
+
+        <div class="mechanic-card">
+          <div class="mechanic-icon">🏅</div>
+          <h3 class="mechanic-title">5-Judge Olympic Scoring</h3>
+          <p class="mechanic-desc">Judges from USA, Sweden, Switzerland, Austria, and Japan grade your jump. High and low scores are discarded, trick repetitions decay, and scores tally to 10.00.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controls & Scoring Rules Reference -->
+    <section class="controls-section" id="controls">
+      <div class="section-header">
+        <span class="section-eyebrow">PILOT MANUAL</span>
+        <h2 class="section-heading">Mastering the Jumps</h2>
+        <p class="section-desc">Study the controls, perfect your timing, and understand how the FIS jury determines your podium score.</p>
+      </div>
+
+      <div class="controls-grid">
+        <!-- Keyboard Mapping Panel -->
+        <div class="controls-panel">
+          <h3 class="panel-heading">⌨️ KEYBOARD & TOUCH MAPPINGS</h3>
+          <table class="controls-table">
+            <tbody>
+              <tr>
+                <td class="key-col"><span class="keycap">SPACE</span> / <span class="keycap">ENTER</span></td>
+                <td class="desc-col">Drop in from tower gate / Retry after scoring</td>
+              </tr>
+              <tr>
+                <td class="key-col"><span class="keycap">S</span> or <span class="keycap">↓</span></td>
+                <td class="desc-col">Backflip (Hold to loop, each 360° scores points)</td>
+              </tr>
+              <tr>
+                <td class="key-col"><span class="keycap">W</span> or <span class="keycap">↑</span></td>
+                <td class="desc-col">Frontflip (Hold to loop, each 360° scores points)</td>
+              </tr>
+              <tr>
+                <td class="key-col"><span class="keycap">J</span> / <span class="keycap">Z</span> / <span class="keycap">X</span></td>
+                <td class="desc-col">Pirouette 360° axial spin (combines with flips)</td>
+              </tr>
+              <tr>
+                <td class="key-col"><span class="keycap">D</span> or <span class="keycap">→</span></td>
+                <td class="desc-col">Daffy Split pose (Hold continuously for 0.4s)</td>
+              </tr>
+              <tr>
+                <td class="key-col"><span class="keycap">A</span> or <span class="keycap">←</span></td>
+                <td class="desc-col">Mule Kick pose (Hold continuously for 0.4s)</td>
+              </tr>
+              <tr>
+                <td class="key-col"><span class="keycap">SHIFT</span></td>
+                <td class="desc-col">Swan Dive layout (Hold continuously for 0.4s)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Scoring System Rules Panel -->
+        <div class="controls-panel">
+          <h3 class="panel-heading">📋 FIS JUDGING CRITERIA</h3>
+          <ul class="scoring-rules-list">
+            <li>
+              <span class="rule-num">1</span>
+              <div><strong>Difficulty & Multipliers:</strong> Frontflips (2.6 pts), Backflips (2.4 pts), Twists (1.8 pts), Swan Dive (1.5 pts), Daffy & Mule Kick (1.3 pts).</div>
+            </li>
+            <li>
+              <span class="rule-num">2</span>
+              <div><strong>Diminishing Returns:</strong> Repeating the same trick reduces score value (100% on 1st, 80% on 2nd, 60% on 3rd). Variety is rewarded!</div>
+            </li>
+            <li>
+              <span class="rule-num">3</span>
+              <div><strong>Landing Bonus:</strong> Perfect alignment adds +2.8 points. Clean landing adds +1.4 points.</div>
+            </li>
+            <li>
+              <span class="rule-num">4</span>
+              <div><strong>Crash Penalty:</strong> Touching down with an active stunt, improper angle, or unresolved twist causes a crash and immediate Disqualification (0.00).</div>
+            </li>
+            <li>
+              <span class="rule-num">5</span>
+              <div><strong>Olympic Trim:</strong> High and low scores from the 5 judges are dropped to eliminate individual bias.</div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screenshot Gallery -->
+    <section class="gallery-section" id="gallery">
+      <div class="section-header">
+        <span class="section-eyebrow">VISUAL ARCHIVES</span>
+        <h2 class="section-heading">Screenshots & UI Showcase</h2>
+        <p class="section-desc">Click any screenshot to zoom in and examine the retro synthwave aesthetics and telemetry displays.</p>
+      </div>
+
+      <div class="gallery-grid">
+        <div class="gallery-item" onclick="openLightbox('./assets/screenshots/canvas2d-gate.png', 'Canvas 2D - Starting Gate & In-Run with Sunset Mountains')">
+          <img src="./assets/screenshots/canvas2d-gate.png" alt="Starting Gate View" class="gallery-img" loading="lazy">
+          <div class="gallery-caption">
+            <div>
+              Starting Gate
+              <span class="sub">In-Run Tower</span>
+            </div>
+            <span>🔍 Zoom</span>
+          </div>
+        </div>
+
+        <div class="gallery-item" onclick="openLightbox('./assets/screenshots/canvas2d-airborne.png', 'Canvas 2D - Airborne Flight with Live Alignment Needle')">
+          <img src="./assets/screenshots/canvas2d-airborne.png" alt="Mid-Air Trick and Alignment Needle" class="gallery-img" loading="lazy">
+          <div class="gallery-caption">
+            <div>
+              Mid-Air Flight
+              <span class="sub">Slope Alignment HUD</span>
+            </div>
+            <span>🔍 Zoom</span>
+          </div>
+        </div>
+
+        <div class="gallery-item" onclick="openLightbox('./assets/screenshots/canvas2d-results.png', 'FIS Official Results - 5 Judge Olympic Scoreboard Modal')">
+          <img src="./assets/screenshots/canvas2d-results.png" alt="Olympic Scoreboard Results" class="gallery-img" loading="lazy">
+          <div class="gallery-caption">
+            <div>
+              FIS Official Results
+              <span class="sub">Olympic Scoreboard</span>
+            </div>
+            <span>🔍 Zoom</span>
+          </div>
+        </div>
+
+        <div class="gallery-item" onclick="openLightbox('./assets/screenshots/webgl-gate.png', 'WebGL Shader Edition - Hardware Accelerated Retro Scene')">
+          <img src="./assets/screenshots/webgl-gate.png" alt="WebGL Edition Gate" class="gallery-img" loading="lazy">
+          <div class="gallery-caption">
+            <div>
+              WebGL Launch Pad
+              <span class="sub">GPU Batch Renderer</span>
+            </div>
+            <span>🔍 Zoom</span>
+          </div>
+        </div>
+
+        <div class="gallery-item" onclick="openLightbox('./assets/screenshots/webgl-airborne.png', 'WebGL Edition - Mid-Air Rotation and Stunt Telemetry')">
+          <img src="./assets/screenshots/webgl-airborne.png" alt="WebGL Mid-Air Stunt" class="gallery-img" loading="lazy">
+          <div class="gallery-caption">
+            <div>
+              WebGL Airborne Combo
+              <span class="sub">Shader Rendering</span>
+            </div>
+            <span>🔍 Zoom</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Lightbox Modal -->
+  <div class="lightbox" id="lightbox-modal" onclick="closeLightbox()">
+    <div class="lightbox-content" onclick="event.stopPropagation()">
+      <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close image zoom">✕</button>
+      <img id="lightbox-img" class="lightbox-img" src="" alt="Enlarged screenshot">
+      <p id="lightbox-caption" class="lightbox-caption"></p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>
+        <p style="color:#fff; font-weight: 600; margin-bottom: 4px;">Freestyle Aerials</p>
+        <p>Zero-dependency HTML5 retro ski acrobatics simulation.</p>
+      </div>
+      <ul class="footer-links">
+        <li><a href="./ski-acrobat.html" target="_blank">Canvas 2D</a></li>
+        <li><a href="./ski-acrobat-gl.html" target="_blank">WebGL GPU</a></li>
+        <li><a href="./README.md">README</a></li>
+        <li><a href="./LICENSE">MIT License</a></li>
+      </ul>
+      <div style="font-size: 12px;">
+        Hosted on <strong>GitHub Pages</strong>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Game switching & Viewport Control
+    const iframe = document.getElementById('game-frame');
+    const tabCanvas = document.getElementById('tab-canvas');
+    const tabWebGL = document.getElementById('tab-webgl');
+    const standaloneLink = document.getElementById('standalone-link');
+    const engineBadge = document.getElementById('active-engine-badge');
+
+    function switchGame(url, title) {
+      if (!iframe) return;
+      iframe.src = url;
+      standaloneLink.href = url;
+
+      if (url.includes('-gl')) {
+        tabCanvas.classList.remove('active');
+        tabWebGL.classList.add('active');
+        engineBadge.textContent = 'WEBGL SHADER ENGINE';
+        engineBadge.style.color = 'var(--gold)';
+      } else {
+        tabWebGL.classList.remove('active');
+        tabCanvas.classList.add('active');
+        engineBadge.textContent = 'CANVAS 2D ENGINE';
+        engineBadge.style.color = 'var(--orange-bright)';
+      }
+
+      // Scroll viewport into view if not visible
+      const arcadeEl = document.getElementById('arcade-player');
+      if (arcadeEl) {
+        arcadeEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      // Focus iframe after load
+      setTimeout(focusGame, 300);
+    }
+
+    function reloadGame() {
+      if (iframe) {
+        iframe.src = iframe.src;
+        setTimeout(focusGame, 300);
+      }
+    }
+
+    function focusGame() {
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.focus();
+      }
+    }
+
+    function toggleFullscreen() {
+      const stage = document.getElementById('stage-viewport');
+      if (!stage) return;
+      if (!document.fullscreenElement) {
+        stage.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    // Lightbox modal logic
+    const lightbox = document.getElementById('lightbox-modal');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxCaption = document.getElementById('lightbox-caption');
+
+    function openLightbox(src, caption) {
+      if (!lightbox || !lightboxImg) return;
+      lightboxImg.src = src;
+      lightboxCaption.textContent = caption || '';
+      lightbox.classList.add('active');
+    }
+
+    function closeLightbox() {
+      if (!lightbox) return;
+      lightbox.classList.remove('active');
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && lightbox && lightbox.classList.contains('active')) {
+        closeLightbox();
+      }
+    });
+  </script>
+</body>
+</html>
